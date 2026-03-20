@@ -220,10 +220,25 @@ async def run_agent(
             if agent_runner.done():
                 # send agent stats to webchat
                 if astr_event.get_platform_name() == "webchat":
+                    stats_payload = agent_runner.stats.to_dict()
+                    stats_payload["chat_model"] = agent_runner.provider.get_model()
+                    stats_payload["chat_provider_id"] = str(
+                        agent_runner.provider.provider_config.get("id", "")
+                    )
+                    smart_switch_route = astr_event.get_extra("smart_switch_route", {})
+                    if isinstance(smart_switch_route, dict):
+                        for key in (
+                            "category",
+                            "strategy",
+                            "provider_id",
+                        ):
+                            value = smart_switch_route.get(key)
+                            if value not in (None, ""):
+                                stats_payload[f"smart_switch_{key}"] = value
                     await astr_event.send(
                         MessageChain(
                             type="agent_stats",
-                            chain=[Json(data=agent_runner.stats.to_dict())],
+                            chain=[Json(data=stats_payload)],
                         )
                     )
 

@@ -51,6 +51,30 @@
         },
         "image_caption_prompt": {
           "description": "图片转述提示词"
+        },
+        "smart_switch": {
+          "enable": {
+            "description": "启用智能切换",
+            "hint": "根据问题类型和复杂度，在写作、编码、日常模型池之间自动路由"
+          },
+          "judge_model": {
+            "description": "裁判模型",
+            "hint": "规则无法明确分类时，用它补充判断当前请求更适合哪类模型池"
+          },
+          "model_pool": {
+            "writing": {
+              "description": "写作模型池",
+              "hint": "用于写作类任务（如文章创作、文案撰写等）"
+            },
+            "coding": {
+              "description": "编码模型池",
+              "hint": "用于编程任务（如代码生成、调试等）"
+            },
+            "daily": {
+              "description": "日常工作模型池",
+              "hint": "用于日常对话和通用任务"
+            }
+          }
         }
       },
       "provider_stt_settings": {
@@ -699,11 +723,11 @@
       "platform_settings": {
         "enable_id_white_list": {
           "description": "启用白名单",
-          "hint": "启用后,只有在白名单内的会话会被响应。"
+          "hint": "启用后,只有在白名单内的会话会被响应，白名单列表为空时代表不启用白名单（所有 ID 都会被放行）。"
         },
         "id_whitelist": {
           "description": "白名单 ID 列表",
-          "hint": "使用 /sid 获取 ID。"
+          "hint": "使用 /sid 获取 ID。列表为空时表示该白名单不启用（即所有 ID 都在白名单内）。"
         },
         "id_whitelist_log": {
           "description": "输出日志",

@@ -6,6 +6,7 @@ import datetime
 import json
 import os
 import platform
+import re
 import zoneinfo
 from collections.abc import Coroutine
 from dataclasses import dataclass, field
@@ -148,6 +149,110 @@ class MainAgentBuildResult:
     reset_coro: Coroutine | None = None
 
 
+SMART_SWITCH_CATEGORIES = ("coding", "writing", "daily")
+SMART_SWITCH_CODING_KEYWORDS = (
+    "```",
+    " traceback",
+    " stack trace",
+    " exception",
+    " bug",
+    " debug",
+    " pytest",
+    " unittest",
+    " api ",
+    " sdk",
+    " sql",
+    " json",
+    " yaml",
+    " docker",
+    " kubernetes",
+    " git ",
+    " bash",
+    " shell",
+    " terminal",
+    " script",
+    " function",
+    " class ",
+    " variable",
+    " repository",
+    " code",
+    " python",
+    " javascript",
+    " typescript",
+    " java",
+    " golang",
+    " rust",
+    " c++",
+    " 前端",
+    " 后端",
+    " 接口",
+    " 接口设计",
+    " 数据库",
+    " 代码",
+    " 编程",
+    " 调试",
+    " 报错",
+    " 异常",
+    " 日志",
+    " 脚本",
+    " 函数",
+    " 类",
+    " 变量",
+)
+SMART_SWITCH_WRITING_KEYWORDS = (
+    " write ",
+    " rewrite",
+    " polish",
+    " summarize",
+    " summary",
+    " article",
+    " blog",
+    " email",
+    " copywriting",
+    " slogan",
+    " translate",
+    " translation",
+    " proofread",
+    " paraphrase",
+    " proposal",
+    " report",
+    " newsletter",
+    " 文案",
+    " 写作",
+    " 撰写",
+    " 润色",
+    " 改写",
+    " 总结",
+    " 摘要",
+    " 翻译",
+    " 邮件",
+    " 汇报",
+    " 报告",
+    " 文章",
+    " 博客",
+    " 标题",
+    " 宣传",
+    " 小红书",
+    " 公众号",
+    " 朋友圈",
+    " 演讲稿",
+    " 方案",
+)
+SMART_SWITCH_CODE_PATTERN = re.compile(
+    r"\b(def|class|function|const|let|var|import|from|select|insert|update|delete)\b",
+    flags=re.IGNORECASE,
+)
+SMART_SWITCH_JUDGE_PROMPT = (
+    "You are a request router for a chatbot.\n"
+    "Classify the user's latest request into exactly one category:\n"
+    "- coding: software engineering, debugging, scripts, APIs, logs, terminals, code explanation, code generation.\n"
+    "- writing: articles, emails, marketing copy, polishing, rewriting, translation, summaries, long-form writing.\n"
+    "- daily: all other general conversation, Q&A, brainstorming, planning, lifestyle, and everyday tasks.\n"
+    "Return JSON only in this format: {\"category\":\"coding|writing|daily\",\"reason\":\"short reason\"}.\n"
+    "Do not add markdown fences or any extra text.\n"
+)
+
+
 def _select_provider(
     event: AstrMessageEvent, plugin_context: Context
 ) -> Provider | None:
@@ -168,6 +273,277 @@ def _select_provider(
     except ValueError as exc:
         logger.error("Error occurred while selecting provider: %s", exc)
         return None
+
+
+def _resolve_baseline_provider(
+    plugin_context: Context, provider_settings: dict
+) -> Provider | None:
+    default_provider_id = provider_settings.get("default_provider_id")
+    if isinstance(default_provider_id, str) and default_provider_id:
+        provider = plugin_context.get_provider_by_id(default_provider_id)
+        if isinstance(provider, Provider):
+            return provider
+
+    providers = plugin_context.get_all_providers()
+    return providers[0] if providers else None
+
+
+def _should_skip_smart_switch_for_manual_provider(
+    current_provider: Provider | None,
+    plugin_context: Context,
+    provider_settings: dict,
+) -> bool:
+    if not isinstance(current_provider, Provider):
+        return False
+
+    baseline_provider = _resolve_baseline_provider(plugin_context, provider_settings)
+    if not isinstance(baseline_provider, Provider):
+        return False
+
+    current_provider_id = str(current_provider.provider_config.get("id", ""))
+    baseline_provider_id = str(baseline_provider.provider_config.get("id", ""))
+    return bool(
+        current_provider_id
+        and baseline_provider_id
+        and current_provider_id != baseline_provider_id
+    )
+
+
+def _normalize_provider_id_list(raw_ids: object) -> list[str]:
+    if not isinstance(raw_ids, list):
+        return []
+    normalized: list[str] = []
+    seen: set[str] = set()
+    for raw_id in raw_ids:
+        if not isinstance(raw_id, str):
+            continue
+        provider_id = raw_id.strip()
+        if not provider_id or provider_id in seen:
+            continue
+        normalized.append(provider_id)
+        seen.add(provider_id)
+    return normalized
+
+
+def _resolve_provider_from_ids(
+    plugin_context: Context, provider_ids: list[str]
+) -> Provider | None:
+    for provider_id in provider_ids:
+        provider = plugin_context.get_provider_by_id(provider_id)
+        if not isinstance(provider, Provider):
+            logger.warning(
+                "Smart switch provider `%s` is invalid or not found, skip.",
+                provider_id,
+            )
+            continue
+        return provider
+    return None
+
+
+def _build_smart_switch_signal_text(
+    event: AstrMessageEvent,
+    req: ProviderRequest,
+) -> str:
+    prompt = req.prompt if isinstance(req.prompt, str) else ""
+    prompt = prompt.strip() or (event.message_str or "").strip()
+
+    attachment_hints: list[str] = []
+    message_components = event.get_messages()
+    if not isinstance(message_components, list):
+        message_components = getattr(event.message_obj, "message", [])
+    if not isinstance(message_components, list):
+        message_components = []
+
+    for comp in message_components:
+        if isinstance(comp, File):
+            file_name = getattr(comp, "name", "") or ""
+            if file_name:
+                attachment_hints.append(f"file:{file_name}")
+        elif isinstance(comp, Image):
+            attachment_hints.append("image")
+
+    parts = []
+    if prompt:
+        parts.append(prompt)
+    if attachment_hints:
+        parts.append(f"Attachments: {', '.join(attachment_hints[:8])}")
+    return "\n".join(parts).strip()
+
+
+def _infer_smart_switch_category_by_rules(signal_text: str) -> str | None:
+    text = (signal_text or "").strip()
+    if not text:
+        return None
+
+    lowered = f" {text.casefold()} "
+    coding_score = 0
+    writing_score = 0
+
+    for keyword in SMART_SWITCH_CODING_KEYWORDS:
+        if keyword in lowered:
+            coding_score += 2
+    for keyword in SMART_SWITCH_WRITING_KEYWORDS:
+        if keyword in lowered:
+            writing_score += 2
+
+    if SMART_SWITCH_CODE_PATTERN.search(text):
+        coding_score += 3
+
+    if any(char in text for char in ("{", "}", ";", "=>")):
+        coding_score += 1
+
+    if coding_score >= 3 and coding_score >= writing_score + 1:
+        return "coding"
+    if writing_score >= 3 and writing_score > coding_score:
+        return "writing"
+    return None
+
+
+def _parse_smart_switch_category(raw_text: str) -> str | None:
+    if not raw_text:
+        return None
+
+    text = raw_text.strip()
+    if text.startswith("```"):
+        text = re.sub(r"^```(?:json)?\s*|\s*```$", "", text, flags=re.IGNORECASE)
+        text = text.strip()
+
+    try:
+        payload = json.loads(text)
+    except json.JSONDecodeError:
+        payload = None
+
+    if isinstance(payload, dict):
+        category = str(payload.get("category", "")).strip().lower()
+        if category in SMART_SWITCH_CATEGORIES:
+            return category
+
+    lowered = text.lower()
+    for category in SMART_SWITCH_CATEGORIES:
+        if category == lowered or f"\"{category}\"" in lowered:
+            return category
+
+    zh_aliases = {
+        "coding": ("编码", "编程", "代码"),
+        "writing": ("写作", "文案"),
+        "daily": ("日常", "通用"),
+    }
+    for category, aliases in zh_aliases.items():
+        if any(alias in text for alias in aliases):
+            return category
+    return None
+
+
+async def _judge_smart_switch_category(
+    signal_text: str,
+    plugin_context: Context,
+    provider_settings: dict,
+) -> str | None:
+    smart_switch = provider_settings.get("smart_switch", {})
+    if not isinstance(smart_switch, dict):
+        return None
+
+    judge_model_id = smart_switch.get("judge_model")
+    if not isinstance(judge_model_id, str) or not judge_model_id.strip():
+        return None
+
+    judge_provider = plugin_context.get_provider_by_id(judge_model_id.strip())
+    if not isinstance(judge_provider, Provider):
+        logger.warning(
+            "Smart switch judge model `%s` is invalid or not found, skip judge.",
+            judge_model_id,
+        )
+        return None
+
+    try:
+        llm_resp = await judge_provider.text_chat(
+            prompt=(
+                f"{SMART_SWITCH_JUDGE_PROMPT}\n"
+                f"<user_request>\n{signal_text[:4000]}\n</user_request>"
+            ),
+        )
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("Smart switch judge model request failed: %s", exc)
+        return None
+
+    if not llm_resp or not llm_resp.completion_text:
+        return None
+    return _parse_smart_switch_category(llm_resp.completion_text)
+
+
+async def _select_smart_switch_provider(
+    event: AstrMessageEvent,
+    req: ProviderRequest,
+    plugin_context: Context,
+    provider_settings: dict,
+    current_provider: Provider,
+) -> Provider:
+    smart_switch = provider_settings.get("smart_switch", {})
+    if not isinstance(smart_switch, dict) or not smart_switch.get("enable", False):
+        return current_provider
+
+    if event.get_extra("selected_provider"):
+        return current_provider
+
+    if _should_skip_smart_switch_for_manual_provider(
+        current_provider,
+        plugin_context,
+        provider_settings,
+    ):
+        logger.debug(
+            "Skip smart switch because session-specific provider override is active."
+        )
+        return current_provider
+
+    model_pool = smart_switch.get("model_pool", {})
+    if not isinstance(model_pool, dict):
+        return current_provider
+
+    signal_text = _build_smart_switch_signal_text(event, req)
+    category = _infer_smart_switch_category_by_rules(signal_text)
+    strategy = "rule"
+
+    if category is None:
+        category = await _judge_smart_switch_category(
+            signal_text,
+            plugin_context,
+            provider_settings,
+        )
+        strategy = "judge" if category else "fallback"
+
+    if category is None:
+        category = "daily"
+
+    candidate_categories = [category]
+    if category != "daily":
+        candidate_categories.append("daily")
+
+    selected_provider = None
+    for candidate_category in candidate_categories:
+        provider_ids = _normalize_provider_id_list(model_pool.get(candidate_category))
+        selected_provider = _resolve_provider_from_ids(plugin_context, provider_ids)
+        if selected_provider is not None:
+            category = candidate_category
+            break
+
+    final_provider = selected_provider or current_provider
+    final_provider_id = str(final_provider.provider_config.get("id", ""))
+    event.set_extra(
+        "smart_switch_route",
+        {
+            "enabled": True,
+            "category": category,
+            "strategy": strategy,
+            "provider_id": final_provider_id,
+        },
+    )
+    logger.info(
+        "Smart switch routed request to provider `%s` with category `%s` via `%s`.",
+        final_provider_id or "<unknown>",
+        category,
+        strategy,
+    )
+    return final_provider
 
 
 async def _get_session_conv(
@@ -996,10 +1372,7 @@ async def build_main_agent(
 
     If apply_reset is False, will not call reset on the agent runner.
     """
-    provider = provider or _select_provider(event, plugin_context)
-    if provider is None:
-        logger.info("未找到任何对话模型（提供商），跳过 LLM 请求处理。")
-        return None
+    supplied_provider = provider
 
     if req is None:
         if event.get_extra("provider_request"):
@@ -1123,6 +1496,24 @@ async def build_main_agent(
         req.contexts = json.loads(req.contexts)
     req.image_urls = normalize_and_dedupe_strings(req.image_urls)
 
+    provider_settings = config.provider_settings or plugin_context.get_config(
+        umo=event.unified_msg_origin
+    ).get("provider_settings", {})
+    if not isinstance(provider_settings, dict):
+        provider_settings = {}
+    provider = supplied_provider or _select_provider(event, plugin_context)
+    if provider is None:
+        logger.info("未找到任何对话模型（提供商），跳过 LLM 请求处理。")
+        return None
+    if supplied_provider is None:
+        provider = await _select_smart_switch_provider(
+            event,
+            req,
+            plugin_context,
+            provider_settings,
+            provider,
+        )
+
     if config.file_extract_enabled:
         try:
             await _apply_file_extract(event, req, config)
@@ -1207,7 +1598,7 @@ async def build_main_agent(
         enforce_max_turns=config.max_context_length,
         tool_schema_mode=config.tool_schema_mode,
         fallback_providers=_get_fallback_chat_providers(
-            provider, plugin_context, config.provider_settings
+            provider, plugin_context, provider_settings
         ),
     )
 

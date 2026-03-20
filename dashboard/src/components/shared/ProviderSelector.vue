@@ -52,9 +52,24 @@
       <v-card-text class="pa-0" style="max-height: 400px; overflow-y: auto;">
         <v-progress-linear v-if="loading" indeterminate color="primary"></v-progress-linear>
 
+        <div class="provider-toolbar pa-3">
+          <v-text-field
+            v-model="searchQuery"
+            :label="tm('providerSelector.searchPlaceholder')"
+            prepend-inner-icon="mdi-magnify"
+            variant="outlined"
+            density="compact"
+            hide-details
+            clearable
+          />
+          <div class="provider-toolbar-meta text-caption text-medium-emphasis">
+            {{ tm('providerSelector.resultsCount', { count: filteredProviderList.length, total: providerList.length }) }}
+          </div>
+        </div>
+
         <div v-if="multiple && selectedProviders.length > 0" class="pa-3">
-          <div class="text-caption text-medium-emphasis mb-2">
-            {{ tm('providerSelector.selectedCount', { count: selectedProviders.length }) }}
+          <div class="text-caption text-medium-emphasis mb-2 provider-selected-label">
+            {{ tm('providerSelector.selectedProvidersLabel') }}
           </div>
           <v-list density="compact" class="selected-order-list">
             <v-list-item
@@ -93,7 +108,7 @@
           <v-divider class="ma-1"></v-divider>
         </div>
         
-        <v-list v-if="!loading && providerList.length > 0" density="compact">
+        <v-list v-if="!loading && filteredProviderList.length > 0" density="compact">
           <!-- 不选择选项 -->
           <v-list-item
             v-if="!multiple"
@@ -114,21 +129,33 @@
           <v-divider class="ma-1"></v-divider>
           
           <v-list-item
-            v-for="provider in providerList"
+            v-for="provider in filteredProviderList"
             :key="provider.id"
             :value="provider.id"
             @click="selectProvider(provider)"
             :active="isProviderSelected(provider.id)"
             rounded="md"
-            class="ma-1">
-            <v-list-item-title>{{ provider.id }}</v-list-item-title>
-            <v-list-item-subtitle>
-              {{ provider.type || provider.provider_type || tm('providerSelector.unknownType') }}
-              <span v-if="provider.model">- {{ provider.model }}</span>
+            class="ma-1 provider-list-item">
+            <v-list-item-title class="provider-list-item__title">
+              {{ provider.id }}
+            </v-list-item-title>
+            <v-list-item-subtitle class="provider-list-item__subtitle">
+              <span>{{ tm('providerSelector.adapterLabel') }}: {{ provider.type || provider.provider_type || tm('providerSelector.unknownType') }}</span>
+              <span>{{ tm('providerSelector.modelLabel') }}: {{ provider.model || tm('providerSelector.noModel') }}</span>
             </v-list-item-subtitle>
             
             <template v-slot:append>
-              <v-icon v-if="isProviderSelected(provider.id)" color="primary">mdi-check-circle</v-icon>
+              <div class="d-flex align-center ga-2">
+                <v-chip
+                  size="x-small"
+                  variant="tonal"
+                  color="primary"
+                  label
+                >
+                  {{ provider.provider_type || tm('providerSelector.unknownType') }}
+                </v-chip>
+                <v-icon v-if="isProviderSelected(provider.id)" color="primary">mdi-check-circle</v-icon>
+              </div>
             </template>
           </v-list-item>
         </v-list>
@@ -136,6 +163,10 @@
         <div v-else-if="!loading && providerList.length === 0" class="text-center py-8">
           <v-icon size="64" color="grey-lighten-1">mdi-api-off</v-icon>
           <p class="text-grey mt-4">{{ tm('providerSelector.noProviders') }}</p>
+        </div>
+        <div v-else-if="!loading" class="text-center py-8">
+          <v-icon size="64" color="grey-lighten-1">mdi-magnify-close</v-icon>
+          <p class="text-grey mt-4">{{ tm('providerSelector.noSearchResults') }}</p>
         </div>
       </v-card-text>
       
@@ -212,6 +243,7 @@ const loading = ref(false)
 const selectedProvider = ref('')
 const selectedProviders = ref([])
 const providerDrawer = ref(false)
+const searchQuery = ref('')
 
 const hasSelection = computed(() => {
   if (props.multiple) {
@@ -225,6 +257,35 @@ const defaultTab = computed(() => {
     return `select_agent_runner_provider:${props.providerSubtype}`
   }
   return props.providerType || 'chat_completion'
+})
+
+const filteredProviderList = computed(() => {
+  const query = String(searchQuery.value || '').trim().toLowerCase()
+  const baseList = !query
+    ? providerList.value
+    : providerList.value.filter((provider) => {
+        const haystack = [
+          provider.id,
+          provider.model,
+          provider.type,
+          provider.provider_type,
+          provider.provider,
+          provider.provider_source_id
+        ]
+          .filter(Boolean)
+          .join(' ')
+          .toLowerCase()
+        return haystack.includes(query)
+      })
+
+  return [...baseList].sort((left, right) => {
+    const leftSelected = isProviderSelected(left.id) ? 1 : 0
+    const rightSelected = isProviderSelected(right.id) ? 1 : 0
+    if (leftSelected !== rightSelected) {
+      return rightSelected - leftSelected
+    }
+    return String(left.id || '').localeCompare(String(right.id || ''))
+  })
 })
 
 // 监听 modelValue 变化，同步到 selectedProvider
@@ -252,6 +313,7 @@ async function openDialog() {
   } else {
     selectedProvider.value = typeof props.modelValue === 'string' ? props.modelValue : ''
   }
+  searchQuery.value = ''
   dialog.value = true
   await loadProviders()
 }
@@ -379,9 +441,40 @@ function closeProviderDrawer() {
   max-width: 100%;
 }
 
+.provider-toolbar {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: rgb(var(--v-theme-surface));
+  border-bottom: 1px solid rgba(var(--v-theme-on-surface), 0.08);
+}
+
+.provider-toolbar-meta {
+  margin-top: 8px;
+}
+
+.provider-selected-label {
+  letter-spacing: 0.02em;
+}
+
 .selected-order-list {
   background: rgba(var(--v-theme-surface-variant), 0.15);
   border-radius: 10px;
+}
+
+.provider-list-item {
+  min-height: 64px !important;
+}
+
+.provider-list-item__title {
+  font-weight: 600;
+}
+
+.provider-list-item__subtitle {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  white-space: normal;
 }
 
 .v-list-item {

@@ -38,6 +38,7 @@
         "dialogTitle": "Выбор провайдера",
         "loading": "Загрузка...",
         "noProviders": "Доступных провайдеров нет",
+        "noSearchResults": "Подходящие провайдеры не найдены",
         "confirmSelection": "ОК",
         "cancelSelection": "Отмена",
         "clearSelection": "Сбросить выбор",
@@ -46,7 +47,13 @@
         "createProvider": "Создать провайдера",
         "manageProviders": "Управление провайдерами",
         "selectProviderPool": "Выбрать пул провайдеров...",
-        "selectedCount": "Выбрано провайдеров: {count}"
+        "selectedCount": "Выбрано провайдеров: {count}",
+        "selectedProvidersLabel": "Выбранные провайдеры",
+        "searchPlaceholder": "Поиск провайдера или модели",
+        "resultsCount": "{count} / {total}",
+        "modelLabel": "Модель",
+        "adapterLabel": "Адаптер",
+        "noModel": "Модель не настроена"
     },
     "personaSelector": {
         "notSelected": "Не выбрано",

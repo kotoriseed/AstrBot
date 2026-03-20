@@ -123,7 +123,17 @@
     "outputTokens": "Output Tokens",
     "cachedTokens": "Cached Tokens",
     "duration": "Duration",
-    "ttft": "Time to First Token"
+    "ttft": "Time to First Token",
+    "chatProvider": "Chat Provider",
+    "chatModel": "Chat Model",
+    "smartSwitchCategory": "Smart Switch Category",
+    "smartSwitchCategoryCoding": "Coding",
+    "smartSwitchCategoryWriting": "Writing",
+    "smartSwitchCategoryDaily": "Daily",
+    "smartSwitchStrategy": "Routing Strategy",
+    "smartSwitchStrategyRule": "Rule Match",
+    "smartSwitchStrategyJudge": "Judge Model",
+    "smartSwitchStrategyFallback": "Default Fallback"
   },
   "refs": {
     "title": "References",

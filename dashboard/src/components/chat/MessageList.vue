@@ -139,6 +139,30 @@
                                             <span class="stats-menu-value">{{
                                                 formatAgentDuration(msg.content.agentStats) }}</span>
                                         </div>
+                                        <div class="stats-menu-row"
+                                            v-if="msg.content.agentStats.chat_provider_id">
+                                            <span class="stats-menu-label">{{ tm('stats.chatProvider') }}</span>
+                                            <span class="stats-menu-value">{{
+                                                msg.content.agentStats.chat_provider_id }}</span>
+                                        </div>
+                                        <div class="stats-menu-row"
+                                            v-if="msg.content.agentStats.chat_model">
+                                            <span class="stats-menu-label">{{ tm('stats.chatModel') }}</span>
+                                            <span class="stats-menu-value">{{
+                                                msg.content.agentStats.chat_model }}</span>
+                                        </div>
+                                        <div class="stats-menu-row"
+                                            v-if="msg.content.agentStats.smart_switch_category">
+                                            <span class="stats-menu-label">{{ tm('stats.smartSwitchCategory') }}</span>
+                                            <span class="stats-menu-value">{{
+                                                formatSmartSwitchCategory(msg.content.agentStats.smart_switch_category) }}</span>
+                                        </div>
+                                        <div class="stats-menu-row"
+                                            v-if="msg.content.agentStats.smart_switch_strategy">
+                                            <span class="stats-menu-label">{{ tm('stats.smartSwitchStrategy') }}</span>
+                                            <span class="stats-menu-value">{{
+                                                formatSmartSwitchStrategy(msg.content.agentStats.smart_switch_strategy) }}</span>
+                                        </div>
                                     </v-card-text>
                                 </v-card>
                             </v-menu>
@@ -886,6 +910,26 @@ export default {
         formatTTFT(ttft) {
             if (!ttft || ttft <= 0) return '';
             return this.formatDuration(ttft);
+        },
+
+        formatSmartSwitchCategory(category) {
+            const normalized = String(category || '').trim().toLowerCase();
+            const labelMap = {
+                coding: this.tm('stats.smartSwitchCategoryCoding'),
+                writing: this.tm('stats.smartSwitchCategoryWriting'),
+                daily: this.tm('stats.smartSwitchCategoryDaily')
+            };
+            return labelMap[normalized] || category || '';
+        },
+
+        formatSmartSwitchStrategy(strategy) {
+            const normalized = String(strategy || '').trim().toLowerCase();
+            const labelMap = {
+                rule: this.tm('stats.smartSwitchStrategyRule'),
+                judge: this.tm('stats.smartSwitchStrategyJudge'),
+                fallback: this.tm('stats.smartSwitchStrategyFallback')
+            };
+            return labelMap[normalized] || strategy || '';
         },
 
         // 打开图片预览

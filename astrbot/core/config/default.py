@@ -142,6 +142,15 @@ DEFAULT_CONFIG = {
             "shipyard_neo_profile": "python-default",
             "shipyard_neo_ttl": 3600,
         },
+        "smart_switch": {
+            "enable": False,
+            "judge_model": "",
+            "model_pool": {
+                "writing": [],
+                "coding": [],
+                "daily": [],
+            },
+        },
     },
     # SubAgent orchestrator mode:
     # - main_enable = False: disabled; main LLM mounts tools normally (persona selection).
@@ -2573,6 +2582,34 @@ CONFIG_METADATA_2 = {
                             },
                         },
                     },
+                    "smart_switch": {
+                        "type": "object",
+                        "items": {
+                            "enable": {
+                                "type": "bool",
+                            },
+                            "judge_model": {
+                                "type": "string",
+                            },
+                            "model_pool": {
+                                "type": "object",
+                                "items": {
+                                    "writing": {
+                                        "type": "list",
+                                        "items": {"type": "string"},
+                                    },
+                                    "coding": {
+                                        "type": "list",
+                                        "items": {"type": "string"},
+                                    },
+                                    "daily": {
+                                        "type": "list",
+                                        "items": {"type": "string"},
+                                    },
+                                },
+                            },
+                        },
+                    },
                 },
             },
             "provider_stt_settings": {
@@ -2873,6 +2910,54 @@ CONFIG_METADATA_3 = {
                     "provider_settings.image_caption_prompt": {
                         "description": "图片转述提示词",
                         "type": "text",
+                    },
+                    "provider_settings.smart_switch.enable": {
+                        "description": "启用智能切换",
+                        "type": "bool",
+                        "hint": "根据问题类型和复杂度，在写作、编码、日常模型池之间自动路由",
+                    },
+                    "provider_settings.smart_switch.judge_model": {
+                        "description": "裁判模型",
+                        "type": "string",
+                        "_special": "select_provider",
+                        "hint": "规则无法明确分类时，用它补充判断当前请求更适合哪类模型池",
+                        "condition": {
+                            "provider_settings.smart_switch.enable": True,
+                            "provider_settings.enable": True,
+                        },
+                    },
+                    "provider_settings.smart_switch.model_pool.writing": {
+                        "description": "写作模型池",
+                        "type": "list",
+                        "items": {"type": "string"},
+                        "_special": "select_providers",
+                        "hint": "用于写作类任务（如文章创作、文案撰写等）",
+                        "condition": {
+                            "provider_settings.smart_switch.enable": True,
+                            "provider_settings.enable": True,
+                        },
+                    },
+                    "provider_settings.smart_switch.model_pool.coding": {
+                        "description": "编码模型池",
+                        "type": "list",
+                        "items": {"type": "string"},
+                        "_special": "select_providers",
+                        "hint": "用于编程任务（如代码生成、调试等）",
+                        "condition": {
+                            "provider_settings.smart_switch.enable": True,
+                            "provider_settings.enable": True,
+                        },
+                    },
+                    "provider_settings.smart_switch.model_pool.daily": {
+                        "description": "日常工作模型池",
+                        "type": "list",
+                        "items": {"type": "string"},
+                        "_special": "select_providers",
+                        "hint": "用于日常对话和通用任务",
+                        "condition": {
+                            "provider_settings.smart_switch.enable": True,
+                            "provider_settings.enable": True,
+                        },
                     },
                 },
                 "condition": {
@@ -3439,7 +3524,7 @@ CONFIG_METADATA_3 = {
                         "description": "白名单 ID 列表",
                         "type": "list",
                         "items": {"type": "string"},
-                        "hint": "使用 /sid 获取 ID。",
+                        "hint": "使用 /sid 获取 ID。当白名单列表为空时，代表不启用白名单（即所有 ID 都在白名单内）。",
                     },
                     "platform_settings.id_whitelist_log": {
                         "description": "输出日志",

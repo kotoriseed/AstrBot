@@ -123,7 +123,17 @@
         "outputTokens": "Исходящие",
         "cachedTokens": "Кэшированные",
         "duration": "Время",
-        "ttft": "Время до первого токена"
+        "ttft": "Время до первого токена",
+        "chatProvider": "Провайдер чата",
+        "chatModel": "Модель чата",
+        "smartSwitchCategory": "Категория маршрутизации",
+        "smartSwitchCategoryCoding": "Код",
+        "smartSwitchCategoryWriting": "Текст",
+        "smartSwitchCategoryDaily": "Общее",
+        "smartSwitchStrategy": "Стратегия выбора",
+        "smartSwitchStrategyRule": "По правилам",
+        "smartSwitchStrategyJudge": "Модель-судья",
+        "smartSwitchStrategyFallback": "Резервный путь"
     },
     "refs": {
         "title": "Ссылки",

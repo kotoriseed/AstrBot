@@ -38,6 +38,7 @@
     "dialogTitle": "Select Provider",
     "loading": "Loading...",
     "noProviders": "No providers available",
+    "noSearchResults": "No matching providers",
     "confirmSelection": "Confirm Selection",
     "cancelSelection": "Cancel",
     "clearSelection": "None",
@@ -46,7 +47,13 @@
     "createProvider": "Create Provider",
     "manageProviders": "Provider Management",
     "selectProviderPool": "Select Provider Pool...",
-    "selectedCount": "{count} provider(s) selected"
+    "selectedCount": "{count} provider(s) selected",
+    "selectedProvidersLabel": "Selected providers",
+    "searchPlaceholder": "Search providers or models",
+    "resultsCount": "{count} / {total} result(s)",
+    "modelLabel": "Model",
+    "adapterLabel": "Adapter",
+    "noModel": "No model configured"
   },
   "personaSelector": {
     "notSelected": "Not selected",

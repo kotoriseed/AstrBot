@@ -51,6 +51,30 @@
         },
         "image_caption_prompt": {
           "description": "Image Caption Prompt"
+        },
+        "smart_switch": {
+          "enable": {
+            "description": "Enable Smart Switching",
+            "hint": "Automatically route requests between writing, coding, and daily model pools based on intent and complexity"
+          },
+          "judge_model": {
+            "description": "Judge Model",
+            "hint": "Used as a fallback classifier when rules cannot confidently determine the best model pool"
+          },
+          "model_pool": {
+            "writing": {
+              "description": "Writing Model Pool",
+              "hint": "Used for writing tasks (e.g., article creation, copywriting)"
+            },
+            "coding": {
+              "description": "Coding Model Pool",
+              "hint": "Used for programming tasks (e.g., code generation, debugging)"
+            },
+            "daily": {
+              "description": "Daily Work Model Pool",
+              "hint": "Used for daily conversations and general tasks"
+            }
+          }
         }
       },
       "provider_stt_settings": {
@@ -697,11 +721,11 @@
       "platform_settings": {
         "enable_id_white_list": {
           "description": "Enable Whitelist",
-          "hint": "When enabled, only sessions in the whitelist will be responded to."
+          "hint": "When enabled, only sessions in the whitelist will be responded to. If the whitelist is empty, the whitelist is disabled and all IDs are allowed."
         },
         "id_whitelist": {
           "description": "Whitelist ID List",
-          "hint": "Use /sid to get IDs."
+          "hint": "Use /sid to get IDs. If the list is empty, it means whitelist is disabled (all IDs are in the whitelist)."
         },
         "id_whitelist_log": {
           "description": "Output Logs",

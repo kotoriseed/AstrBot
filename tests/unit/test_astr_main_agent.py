@@ -70,6 +70,8 @@ def mock_event():
     event.get_platform_id.return_value = "test_platform"
     event.get_group_id.return_value = None
     event.get_sender_name.return_value = "TestUser"
+    event.get_messages.return_value = message_obj.message
+    event.set_extra = MagicMock()
     event.trace = MagicMock()
     event.plugins_name = None
     return event
@@ -215,6 +217,189 @@ class TestSelectProvider:
         result = module._select_provider(mock_event, mock_context)
 
         assert result is None
+
+
+class TestSmartSwitchProvider:
+    """Tests for smart switch provider routing."""
+
+    @pytest.mark.asyncio
+    async def test_select_smart_switch_provider_uses_rule_based_coding_pool(
+        self, mock_event
+    ):
+        module = ama
+        default_provider = MagicMock(spec=Provider)
+        default_provider.provider_config = {"id": "default-provider"}
+        default_provider.get_model.return_value = "gpt-4.1-mini"
+
+        coding_provider = MagicMock(spec=Provider)
+        coding_provider.provider_config = {"id": "coding-provider"}
+        coding_provider.get_model.return_value = "gpt-4.1"
+
+        mock_context = MagicMock()
+        mock_context.get_all_providers.return_value = [
+            default_provider,
+            coding_provider,
+        ]
+        mock_context.get_provider_by_id.side_effect = lambda provider_id: {
+            "default-provider": default_provider,
+            "coding-provider": coding_provider,
+        }.get(provider_id)
+
+        req = ProviderRequest(prompt="请帮我排查这段 Python 代码为什么报错")
+        provider_settings = {
+            "default_provider_id": "default-provider",
+            "smart_switch": {
+                "enable": True,
+                "judge_model": "",
+                "model_pool": {
+                    "coding": ["coding-provider"],
+                    "writing": [],
+                    "daily": ["default-provider"],
+                },
+            },
+        }
+
+        result = await module._select_smart_switch_provider(
+            mock_event,
+            req,
+            mock_context,
+            provider_settings,
+            default_provider,
+        )
+
+        assert result == coding_provider
+        mock_event.set_extra.assert_called_with(
+            "smart_switch_route",
+            {
+                "enabled": True,
+                "category": "coding",
+                "strategy": "rule",
+                "provider_id": "coding-provider",
+            },
+        )
+
+    @pytest.mark.asyncio
+    async def test_select_smart_switch_provider_uses_judge_model_when_rules_unclear(
+        self, mock_event
+    ):
+        module = ama
+        default_provider = MagicMock(spec=Provider)
+        default_provider.provider_config = {"id": "default-provider"}
+        default_provider.get_model.return_value = "gpt-4.1-mini"
+
+        writing_provider = MagicMock(spec=Provider)
+        writing_provider.provider_config = {"id": "writing-provider"}
+        writing_provider.get_model.return_value = "claude-sonnet"
+
+        judge_provider = MagicMock(spec=Provider)
+        judge_provider.provider_config = {"id": "judge-provider"}
+        judge_provider.text_chat = AsyncMock(
+            return_value=MagicMock(completion_text='{"category":"writing"}')
+        )
+
+        mock_context = MagicMock()
+        mock_context.get_all_providers.return_value = [
+            default_provider,
+            writing_provider,
+        ]
+        mock_context.get_provider_by_id.side_effect = lambda provider_id: {
+            "default-provider": default_provider,
+            "writing-provider": writing_provider,
+            "judge-provider": judge_provider,
+        }.get(provider_id)
+
+        req = ProviderRequest(prompt="帮我整理一下这段内容，让它更像正式邮件。")
+        provider_settings = {
+            "default_provider_id": "default-provider",
+            "smart_switch": {
+                "enable": True,
+                "judge_model": "judge-provider",
+                "model_pool": {
+                    "coding": [],
+                    "writing": ["writing-provider"],
+                    "daily": ["default-provider"],
+                },
+            },
+        }
+
+        with patch.object(
+            module,
+            "_infer_smart_switch_category_by_rules",
+            return_value=None,
+        ):
+            result = await module._select_smart_switch_provider(
+                mock_event,
+                req,
+                mock_context,
+                provider_settings,
+                default_provider,
+            )
+
+        assert result == writing_provider
+        judge_provider.text_chat.assert_awaited_once()
+        mock_event.set_extra.assert_called_with(
+            "smart_switch_route",
+            {
+                "enabled": True,
+                "category": "writing",
+                "strategy": "judge",
+                "provider_id": "writing-provider",
+            },
+        )
+
+    @pytest.mark.asyncio
+    async def test_select_smart_switch_provider_keeps_session_override(
+        self, mock_event
+    ):
+        module = ama
+        default_provider = MagicMock(spec=Provider)
+        default_provider.provider_config = {"id": "default-provider"}
+        default_provider.get_model.return_value = "gpt-4.1-mini"
+
+        session_provider = MagicMock(spec=Provider)
+        session_provider.provider_config = {"id": "session-provider"}
+        session_provider.get_model.return_value = "deepseek-chat"
+
+        coding_provider = MagicMock(spec=Provider)
+        coding_provider.provider_config = {"id": "coding-provider"}
+        coding_provider.get_model.return_value = "gpt-4.1"
+
+        mock_context = MagicMock()
+        mock_context.get_all_providers.return_value = [
+            default_provider,
+            session_provider,
+            coding_provider,
+        ]
+        mock_context.get_provider_by_id.side_effect = lambda provider_id: {
+            "default-provider": default_provider,
+            "session-provider": session_provider,
+            "coding-provider": coding_provider,
+        }.get(provider_id)
+
+        req = ProviderRequest(prompt="请帮我修一下这个接口的 Python 代码")
+        provider_settings = {
+            "default_provider_id": "default-provider",
+            "smart_switch": {
+                "enable": True,
+                "judge_model": "",
+                "model_pool": {
+                    "coding": ["coding-provider"],
+                    "writing": [],
+                    "daily": ["default-provider"],
+                },
+            },
+        }
+
+        result = await module._select_smart_switch_provider(
+            mock_event,
+            req,
+            mock_context,
+            provider_settings,
+            session_provider,
+        )
+
+        assert result == session_provider
+        mock_event.set_extra.assert_not_called()
 
 
 class TestGetSessionConv:

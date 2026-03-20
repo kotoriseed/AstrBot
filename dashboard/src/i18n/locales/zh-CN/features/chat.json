@@ -123,7 +123,17 @@
     "outputTokens": "输出 Token",
     "cachedTokens": "缓存 Token",
     "duration": "耗时",
-    "ttft": "首字时间"
+    "ttft": "首字时间",
+    "chatProvider": "对话提供商",
+    "chatModel": "对话模型",
+    "smartSwitchCategory": "智能切换类别",
+    "smartSwitchCategoryCoding": "编码",
+    "smartSwitchCategoryWriting": "写作",
+    "smartSwitchCategoryDaily": "日常",
+    "smartSwitchStrategy": "判定方式",
+    "smartSwitchStrategyRule": "规则命中",
+    "smartSwitchStrategyJudge": "裁判模型",
+    "smartSwitchStrategyFallback": "默认回退"
   },
   "refs": {
     "title": "引用",

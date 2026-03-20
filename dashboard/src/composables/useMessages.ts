@@ -25,6 +25,10 @@ export interface AgentStats {
     start_time: number;
     end_time: number;
     time_to_first_token: number;
+    chat_model?: string;
+    chat_provider_id?: string;
+    smart_switch_category?: string;
+    smart_switch_strategy?: string;
 }
 
 // 文件信息结构
